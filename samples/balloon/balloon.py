@@ -43,7 +43,7 @@ from mrcnn.config import Config
 from mrcnn import model as modellib, utils
 
 # Path to trained weights file
-COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
+COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mymodel.h5")
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
@@ -161,6 +161,11 @@ class BalloonDataset(utils.Dataset):
         for i, p in enumerate(info["polygons"]):
             # Get indexes of pixels inside the polygon and set them to 1
             rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
+
+            # FIX
+            rr[rr > mask.shape[0]-1] = mask.shape[0]-1
+            cc[cc > mask.shape[1]-1] = mask.shape[1]-1
+
             mask[rr, cc, i] = 1
 
         # Return mask, and array of class IDs of each instance. Since we have

@@ -30,7 +30,8 @@ from distutils.version import LooseVersion
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
 
-
+import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
 ############################################################
 #  Utility Functions
 ############################################################
@@ -338,7 +339,7 @@ class ProposalLayer(KE.Layer):
 
 def log2_graph(x):
     """Implementation of Log2. TF doesn't have a native implementation."""
-    return tf.log(x) / tf.log(2.0)
+    return tf.math.log(x) / tf.math.log(2.0)
 
 
 class PyramidROIAlign(KE.Layer):
@@ -544,7 +545,7 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     positive_roi_bool = (roi_iou_max >= 0.5)
     positive_indices = tf.where(positive_roi_bool)[:, 0]
     # 2. Negative ROIs are those with < 0.5 with every GT box. Skip crowds.
-    negative_indices = tf.where(tf.logical_and(roi_iou_max < 0.5, no_crowd_bool))[:, 0]
+    negative_indices = tf.where(tf.math.logical_and(roi_iou_max < 0.5, no_crowd_bool))[:, 0]
 
     # Subsample ROIs. Aim for 33% positive
     # Positive ROIs
@@ -948,7 +949,11 @@ def fpn_classifier_graph(rois, feature_maps, image_meta,
                            name='mrcnn_bbox_fc')(shared)
     # Reshape to [batch, num_rois, NUM_CLASSES, (dy, dx, log(dh), log(dw))]
     s = K.int_shape(x)
-    mrcnn_bbox = KL.Reshape((s[1], num_classes, 4), name="mrcnn_bbox")(x)
+    if s[1] is None:
+        mrcnn_bbox = KL.Reshape((-1, num_classes, 4), name="mrcnn_bbox")(x)
+    else:
+        mrcnn_bbox = KL.Reshape((s[1], num_classes, 4), name="mrcnn_bbox")(x)
+    # mrcnn_bbox = KL.Reshape((s[1], num_classes, 4), name="mrcnn_bbox")(x)
 
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
@@ -2102,11 +2107,10 @@ class MaskRCNN():
         # Conditional import to support versions of Keras before 2.2
         # TODO: remove in about 6 months (end of 2018)
         try:
-            from keras.engine import saving
+            from tensorflow.python.keras.saving import hdf5_format
         except ImportError:
-            # Keras before 2.2 used the 'topology' namespace.
-            from keras.engine import topology as saving
-
+            # Keras before 2.2 used the 'saving' namespace.
+            from tensorflow.python.keras.saving import hdf5_format
         if exclude:
             by_name = True
 
@@ -2127,9 +2131,9 @@ class MaskRCNN():
             layers = filter(lambda l: l.name not in exclude, layers)
 
         if by_name:
-            saving.load_weights_from_hdf5_group_by_name(f, layers)
+            hdf5_format.load_weights_from_hdf5_group_by_name(f, layers)
         else:
-            saving.load_weights_from_hdf5_group(f, layers)
+            hdf5_format.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
             f.close()
 
@@ -2160,15 +2164,23 @@ class MaskRCNN():
             clipnorm=self.config.GRADIENT_CLIP_NORM)
         # Add Losses
         # First, clear previously set losses to avoid duplication
-        self.keras_model._losses = []
-        self.keras_model._per_input_losses = {}
+        # self.keras_model._losses = []
+        # self.keras_model._per_input_losses = {}
         loss_names = [
             "rpn_class_loss",  "rpn_bbox_loss",
             "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss"]
+        exists_names= []
+
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
-            if layer.output in self.keras_model.losses:
+            # if layer.output in self.keras_model.losses:
+                # continue
+
+            if name in exists_names:
                 continue
+
+            exists_names.append(name)
+
             loss = (
                 tf.reduce_mean(layer.output, keepdims=True)
                 * self.config.LOSS_WEIGHTS.get(name, 1.))
@@ -2196,7 +2208,7 @@ class MaskRCNN():
             loss = (
                 tf.reduce_mean(layer.output, keepdims=True)
                 * self.config.LOSS_WEIGHTS.get(name, 1.))
-            self.keras_model.metrics_tensors.append(loss)
+            self.keras_model.metrics.append(loss)
 
     def set_trainable(self, layer_regex, keras_model=None, indent=0, verbose=1):
         """Sets model layers as trainable if their names match
@@ -2251,8 +2263,8 @@ class MaskRCNN():
         if model_path:
             # Continue from we left of. Get epoch and date from the file name
             # A sample model path might look like:
-            # \path\to\logs\coco20171029T2315\mask_rcnn_coco_0001.h5 (Windows)
-            # /path/to/logs/coco20171029T2315/mask_rcnn_coco_0001.h5 (Linux)
+            # \path\to\logs\coco20171029T2315\mymodel_0001.h5 (Windows)
+            # /path/to/logs/coco20171029T2315/mymodel_0001.h5 (Linux)
             regex = r".*[/\\][\w-]+(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})[/\\]mask\_rcnn\_[\w-]+(\d{4})\.h5"
             m = re.match(regex, model_path)
             if m:
