@@ -38,7 +38,7 @@ class TestConfig(Config):
 # define the model
 rcnn = MaskRCNN(mode='inference', model_dir='./', config=TestConfig())
 # load coco model weights
-rcnn.load_weights('mask_rcnn_coco.h5', by_name=True)
+rcnn.load_weights('mymodel.h5', by_name=True)
 # load photograph
 img = load_img('elephant.jpg')
 img = img_to_array(img)
@@ -87,7 +87,7 @@ class TestConfig(Config):
 # define the model
 rcnn = MaskRCNN(mode='inference', model_dir='./', config=TestConfig())
 # load coco model weights
-rcnn.load_weights('mask_rcnn_coco.h5', by_name=True)
+rcnn.load_weights('mymodel.h5', by_name=True)
 # load photograph
 img = load_img('elephant.jpg')
 img = img_to_array(img)

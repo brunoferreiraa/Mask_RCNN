@@ -18,7 +18,7 @@ ROOT_DIR = os.path.abspath("../../")
 sys.path.append(ROOT_DIR)  # To find local version of the library
 
 # Path to trained weights file
-COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
+COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mymodel.h5")
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
@@ -62,7 +62,7 @@ class CustomDataset(utils.Dataset):
         subset: Subset to load: train or val
         """
         # Add classes
-        self.add_class("object", 1, "PV")
+        self.add_class("object", 1, "pv")
 
         # Train or validation dataset?
         assert subset in ["train", "val"]
@@ -83,7 +83,7 @@ class CustomDataset(utils.Dataset):
         #   'size': 100202
         # }
         # We mostly care about the x and y coordinates of each region
-        annotations1 = json.load(open(os.path.join(dataset_dir, "via_region_data.json")))
+        annotations1 = json.load(open(os.path.join(dataset_dir, "custom_object.json").replace("\\", "/")))
         # print(annotations1)
         annotations = list(annotations1.values())  # don't need the dict keys
 
@@ -97,10 +97,18 @@ class CustomDataset(utils.Dataset):
             # Get the x, y coordinaets of points of the polygons that make up
             # the outline of each object instance. There are stores in the
             # shape_attributes (see json format above)
-            polygons = [r['shape_attributes'] for r in a['regions']]
-            objects = [s['region_attributes']['PV'] for s in a['regions']]  # TODO
+
+            if type(a['regions']) is dict:
+                polygons = [r['shape_attributes'] for r in a['regions'].values()]
+                objects = [s['region_attributes']['name'] for s in a['regions'].values()]  # TODO
+
+            else:
+                polygons = [r['shape_attributes'] for r in a['regions']]
+                objects = [s['region_attributes']['name'] for s in a['regions']]  # TODO
+
+            # polygons = [r['shape_attributes'] for r in a['regions']]
             print("objects:", objects)
-            name_dict = {"PV": 1}  # TODO
+            name_dict = {"pv": 1}  # TODO
             # key = tuple(name_dict)
             num_ids = [name_dict[a] for a in objects]
 
@@ -143,6 +151,11 @@ class CustomDataset(utils.Dataset):
                         dtype=np.uint8)
         for i, p in enumerate(info["polygons"]):
             rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
+
+            # FIX
+            rr[rr > mask.shape[0]-1] = mask.shape[0]-1
+            cc[cc > mask.shape[1]-1] = mask.shape[1]-1
+
             mask[rr, cc, i] = 1
 
         # Return mask, and array of class IDs of each instance. Since we have

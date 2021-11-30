@@ -33,7 +33,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # Path to Ballon trained weights
 # You can download this file from the Releases page
 # https://github.com/matterport/Mask_RCNN/releases
-BALLON_WEIGHTS_PATH = "../../mask_rcnn_balloon.h5"  # TODO: update this path
+BALLON_WEIGHTS_PATH = "../../mymodel.h5"  # TODO: update this path
 
 config = custom.CustomConfig()
 CUSTOM_DIR = os.path.join(ROOT_DIR, "dataset")
